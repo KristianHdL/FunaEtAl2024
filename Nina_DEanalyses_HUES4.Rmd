@@ -1,0 +1,340 @@
+---
+title: "Nina Diff Expr Analyses"
+output: html_document
+---
+---
+title: "Deseq2 RNAseq d05,07 human ES diff to insulin+ cells analysis testing diff between experiments"
+author: "Kristian Honnens de Lichtenberg"
+date: "`r Sys.Date()`"
+---
+
+
+```{r setupKNITR, include=FALSE}
+knitr::opts_chunk$set(cache=T)
+```
+
+
+```{r libraries, include=F, echo=FALSE}
+library(knitr)
+opts_chunk$set(root.dir ="/Users/Kristians/Dropbox/Kristian<->Palle/Nina_hES_d5_d7")
+source("http://bioconductor.org/biocLite.R")
+
+#biocLite(c( "DESeq2","ggplot2", "readxl", "EDASeq", "org.Hs.eg.db"), suppressUpdates=F, suppressAutoUpdate=F, ask=F)
+library(ggplot2)
+library(DESeq2)
+library(superheat)
+library(RColorBrewer)
+
+library(readxl)
+library(magrittr)
+library(dplyr)
+library(openxlsx)
+```
+
+Read DDS object from HUES4 & H1 project, remvoe  H1 clel line columns.
+```{r read DDS}
+
+dds<-readRDS("dds_HUES4_H1.RDS")
+dds<-dds[,colData(dds)$Cell_line=="HUES4"]
+
+dds <- DESeqDataSetFromMatrix(countData = counts(dds),colData=colData(dds), design= ~Exp_batch+Treatment) 
+
+
+```
+
+```{r vsdPCA d5}
+vsd <- vst(dds[,dds$Diff_day=="D5"], blind=FALSE)
+
+pcaData <- plotPCA(vsd, intgroup=colnames(colData(dds)), returnData=TRUE)
+percentVar <- round(100 * attr(pcaData, "percentVar"))
+ggplot(pcaData, aes(PC1, PC2, color=Treatment, shape=Exp_batch)) +
+  geom_point(size=3) + scale_color_brewer(palette = "Set2") +
+  xlab(paste0("PC1: ",percentVar[1],"% variance")) +
+  ylab(paste0("PC2: ",percentVar[2],"% variance")) + 
+  coord_fixed()
+#ggsave(filename = "PCA_treatmentCellLine.pdf")
+
+#treatment diffday
+ggplot(pcaData, aes(PC1, PC2, color=Treatment, shape=Exp_batch)) +
+  geom_point(size=3) + scale_color_brewer(palette = "Set2") +
+  xlab(paste0("PC1: ",percentVar[1],"% variance")) +
+  ylab(paste0("PC2: ",percentVar[2],"% variance")) + 
+  coord_fixed()
+ggsave(filename = "PCA_treatmentDiffDay_D5.pdf")
+
+```
+
+```{r vsdPCA d7}
+vsd <- vst(dds[,dds$Diff_day=="D7"], blind=FALSE)
+
+pcaData <- plotPCA(vsd, intgroup=colnames(colData(dds)), returnData=TRUE)
+percentVar <- round(100 * attr(pcaData, "percentVar"))
+ggplot(pcaData, aes(PC1, PC2, color=Treatment, shape=Exp_batch)) +
+  geom_point(size=3) + scale_color_brewer(palette = "Set2") +
+  xlab(paste0("PC1: ",percentVar[1],"% variance")) +
+  ylab(paste0("PC2: ",percentVar[2],"% variance")) + 
+  coord_fixed()
+#ggsave(filename = "PCA_treatmentCellLine.pdf")
+
+#treatment diffday
+ggplot(pcaData, aes(PC1, PC2, color=Treatment, shape=Exp_batch)) +
+  geom_point(size=3) + scale_color_brewer(palette = "Set2") +
+  xlab(paste0("PC1: ",percentVar[1],"% variance")) +
+  ylab(paste0("PC2: ",percentVar[2],"% variance")) + 
+  coord_fixed()
+ggsave(filename = "PCA_treatmentDiffDay_D7.pdf")
+
+```
+
+##Diff Expr
+
+```{r DE treatment}
+#dds <- DESeqDataSetFromMatrix(countData = countMatrix,colData=sampleTable, design= ~Treatment) 
+
+dds<-DESeq(dds)
+(treatmentList<-resultsNames(dds)[-c(1:3)])
+
+#treatmentResult<-results(dds, name=treatmentList[1],  lfcThreshold = 0.58, alpha = 0.1)
+#treatmentResult<-lfcShrink(dds, coef=treatmentList[1],  lfcThreshold = 0.58)
+#summary(treatmentResult)
+
+
+#up and down, LogFC=0.58 threshold:
+treatmentResult<-lapply(treatmentList, function(x) results(dds, name=x, lfcThreshold = 0.58))
+names(treatmentResult)<-treatmentList
+lapply(treatmentResult[1:3], function(x) summary(x))
+treatmentDF<-lapply(treatmentResult, function(x) data.frame(x))
+
+
+write.xlsx(treatmentDF[1],paste0("Results_D5D7together_",names(treatmentDF[1]),".xlsx"),sheetName=paste0(names(treatmentDF[1])), col.names=TRUE, row.names=TRUE, append=FALSE)
+
+write.xlsx(treatmentDF[2],paste0("Results_D5D7together_",names(treatmentDF[2]),".xlsx"),sheetName=paste0(names(treatmentDF[2])), col.names=TRUE, row.names=TRUE, append=FALSE)
+
+write.xlsx(treatmentDF[3],paste0("Results_D5D7together_",names(treatmentDF[3]),".xlsx"),sheetName=paste0(names(treatmentDF[3])), col.names=TRUE, row.names=TRUE, append=FALSE)
+
+
+
+
+
+```
+
+
+```{r D5 only}
+dds_d5<-dds[,which(colData(dds)$Diff_day=="D5")]
+dds_d5<-DESeq(dds_d5)
+(treatmentList<-resultsNames(dds_d5)[-c(1:3)])
+
+#up and down, LogFC=0.58 threshold:
+treatmentResult<-lapply(treatmentList, function(x) results(dds_d5, name=x, lfcThreshold = 0.58))
+names(treatmentResult)<-c("D5_IWP_vs_BM"  ,   "D5_IWP.TGF_vs_BM" ,"D5_TGF_vs_BM" )
+lapply(treatmentResult[1:3], function(x) summary(x))
+treatmentD5<-lapply(treatmentResult, function(x) data.frame(x))
+
+
+write.xlsx(treatmentD5[1],paste0("Results_",names(treatmentD5[1]),".xlsx"),sheetName=paste0(names(treatmentD5[1])), col.names=TRUE, row.names=TRUE, append=FALSE)
+write.xlsx(treatmentD5[2],paste0("Results_",names(treatmentD5[2]),".xlsx"),sheetName=paste0(names(treatmentD5[2])), col.names=TRUE, row.names=TRUE, append=FALSE)
+write.xlsx(treatmentD5[3],paste0("Results_",names(treatmentD5[3]),".xlsx"),sheetName=paste0(names(treatmentD5[3])), col.names=TRUE, row.names=TRUE, append=FALSE)
+```
+
+
+```{r D7 only}
+dds_D7<-dds[,which(colData(dds)$Diff_day=="D7")]
+dds_D7<-DESeq(dds_D7)
+(treatmentList<-resultsNames(dds_D7)[-c(1:3)])
+
+#up and down, LogFC=0.58 threshold:
+treatmentResult<-lapply(treatmentList, function(x) results(dds_D7, name=x, lfcThreshold = 0.58))
+names(treatmentResult)<-c("D7_IWP_vs_BM"  ,   "D7_IWP.TGF_vs_BM" ,"D7_TGF_vs_BM" )
+lapply(treatmentResult[1:3], function(x) summary(x))
+treatmentD7<-lapply(treatmentResult, function(x) data.frame(x))
+
+
+write.xlsx(treatmentD7[1],paste0("Results_",names(treatmentD7[1]),".xlsx"),sheetName=paste0(names(treatmentD7[1])), col.names=TRUE, row.names=TRUE, append=FALSE)
+write.xlsx(treatmentD7[2],paste0("Results_",names(treatmentD7[2]),".xlsx"),sheetName=paste0(names(treatmentD7[2])), col.names=TRUE, row.names=TRUE, append=FALSE)
+write.xlsx(treatmentD7[3],paste0("Results_",names(treatmentD7[3]),".xlsx"),sheetName=paste0(names(treatmentD7[3])), col.names=TRUE, row.names=TRUE, append=FALSE)
+```
+
+
+
+```{r collect sign genes for heatmap d5}
+library(superheat)
+
+
+all_genes<-lapply(treatmentD5, function(x) rownames(x)[abs(x$log2FoldChange)>1&x$padj<0.01])
+all_unlist<-unlist(all_genes)
+all_undup<-unique(all_unlist)
+length(all_undup)
+
+count_matrix<-counts(dds_d5)
+
+colData(dds_d5)$SampleName<-interaction(colData(dds_d5)$Treatment, colData(dds_d5)$Exp_batch)
+
+count_D5DE<-count_matrix[which(rownames(count_matrix) %in% all_undup),]
+
+count_D5DE<-count_D5DE[!is.na(count_D5DE[,1]),]
+
+
+dat_scaled<- t(scale(t(count_D5DE)))
+colnames(dat_scaled)<-dds_d5$SampleName
+
+
+png("d5_heatmap_SampleName.png", height = 600, width = 500)
+  set.seed(108); 
+  superheat(dat_scaled,
+            #membership.cols = dds_d5$Treatment,
+    order.cols = order(as.character(dds_d5$SampleName)),
+     heat.pal = brewer.pal(5,"YlOrRd"), 
+     pretty.order.cols = T,
+     scale=F,
+     n.clusters.rows=5,
+     dist.method=c("manhattan"),
+     clustering.method=c("kmeans"),
+     title=c("Heatmap of Day 5 \n Differentially Expressed Genes"),
+   bottom.label.text.angle = 90, 
+     bottom.label.size = 0.3,
+      left.label.size = 0.1,
+     bottom.label.text.size = 4,
+     bottom.label.text.alignment = "center")
+dev.off()
+
+png("d5_heatmap_Treatment.png", height = 600, width = 500)
+set.seed(108); 
+  superheat(dat_scaled, membership.cols = dds_d5$Treatment,
+            order.cols = order(as.character(dds_d5$SampleName)),
+     heat.pal = brewer.pal(5,"YlOrRd"), 
+     pretty.order.cols = T,
+     scale=F,
+     n.clusters.rows=5,
+     dist.method=c("manhattan"),
+     clustering.method=c("kmeans"),
+     title=c("Heatmap of Day 5 \n Differentially Expressed Genes"),
+     bottom.label.text.angle = 0, 
+     bottom.label.size = 0.1,
+     bottom.label.text.size = 5,
+     bottom.label.text.alignment = c("center"))
+dev.off()
+     
+png("d5_heatmap_TreatmentSmooth.png", height = 600, width = 500)
+set.seed(108); 
+  superheat(dat_scaled, membership.cols = dds_d5$Treatment,
+     heat.pal = brewer.pal(5,"YlOrRd"), 
+     pretty.order.cols = T,
+     scale=F,
+     n.clusters.rows=5,
+     dist.method=c("manhattan"),
+     clustering.method=c("kmeans"),
+     title=c("Heatmap of Day 5 \n Differentially Expressed Genes"),
+     bottom.label.text.angle = 0, 
+     bottom.label.size = 0.1,
+     bottom.label.text.size = 5,
+     bottom.label.text.alignment = c("center"), smooth.heat = T)
+dev.off()
+```
+
+
+```{r collect sign genes for heatmap d7}
+
+all_genes<-lapply(treatmentD7, function(x) rownames(x)[abs(x$log2FoldChange)>1&x$padj<0.05])
+all_unlist<-unlist(all_genes)
+all_undup<-unique(all_unlist)
+length(all_undup)
+
+count_matrix<-counts(dds_D7)
+
+colData(dds_D7)$SampleName<-interaction(colData(dds_D7)$Treatment, colData(dds_D7)$Exp_batch)
+
+count_D7DE<-count_matrix[which(rownames(count_matrix) %in% all_undup),]
+
+count_D7DE<-count_D7DE[!is.na(count_D7DE[,1]),]
+
+
+dat_scaled<- t(scale(t(count_D7DE)))
+colnames(dat_scaled)<-dds_D7$SampleName
+
+png("d7_heatmap_SampleName.png", height = 600, width = 500)
+  set.seed(108); 
+  superheat(dat_scaled, 
+            #membership.cols = dds_D7$Treatment,
+            order.cols = order(as.character(dds_D7$SampleName)),
+     heat.pal = brewer.pal(5,"YlOrRd"), 
+     pretty.order.cols = T,
+     scale=F,
+     n.clusters.rows=5,
+     dist.method=c("manhattan"),
+     clustering.method=c("kmeans"),
+     title=c("Heatmap of Day 7 \n Differentially Expressed Genes"),
+     bottom.label.text.angle = 90, 
+     bottom.label.size = 0.3,
+      left.label.size = 0.1,
+     bottom.label.text.size = 4,
+     bottom.label.text.alignment = "center", column.title = "Variables")
+dev.off()
+
+png("d7_heatmap_Treatment.png", height = 600, width = 500)
+set.seed(108); 
+  superheat(dat_scaled, 
+            membership.cols = dds_D7$Treatment,
+                        order.cols = order(as.character(dds_D7$SampleName)),
+     heat.pal = brewer.pal(5,"YlOrRd"), 
+     pretty.order.cols = T,
+     scale=F,
+     n.clusters.rows=5,
+     dist.method=c("manhattan"),
+     clustering.method=c("kmeans"),
+     title=c("Heatmap of Day 7 \n Differentially Expressed Genes"),
+     bottom.label.text.angle = 0, 
+     bottom.label.size = 0.1,
+     bottom.label.text.size = 5,
+     bottom.label.text.alignment = c("center"))
+dev.off()
+     
+png("d7_heatmap_TreatmentSmooth.png", height = 600, width = 500)
+set.seed(108); 
+  superheat(dat_scaled, membership.cols = dds_D7$Treatment,
+     heat.pal = brewer.pal(5,"YlOrRd"), 
+     pretty.order.cols = T,
+     scale=F,
+     n.clusters.rows=5,
+     dist.method=c("manhattan"),
+     clustering.method=c("kmeans"),
+     title=c("Heatmap of Day 7 \n Differentially Expressed Genes"),
+     bottom.label.text.angle = 0, 
+     bottom.label.size = 0.1,
+     bottom.label.text.size = 5,
+     bottom.label.text.alignment = c("center"), smooth.heat = T)
+dev.off()
+
+
+  superheat(dat_scaled, membership.cols = dds_D7$Treatment,
+     heat.pal = brewer.pal(5,"YlOrRd"), 
+     pretty.order.cols = T,
+     scale=F,
+     n.clusters.rows=4,
+     dist.method=c("manhattan"),
+     clustering.method=c("kmeans"),
+     title=c("Heatmap of Day 7 \n Differentially Expressed Genes"),
+     bottom.label.text.angle = 0, 
+     bottom.label.size = 0.1,
+     bottom.label.text.size = 5,
+     bottom.label.text.alignment = c("center"), smooth.heat = T)
+  
+  
+    superheat(dat_scaled, membership.cols = dds_D7$Treatment,
+     heat.pal = brewer.pal(5,"YlOrRd"), 
+     pretty.order.cols = T,
+     scale=F,
+     n.clusters.rows=3,
+     dist.method=c("manhattan"),
+     clustering.method=c("kmeans"),
+     title=c("Heatmap of Day 7 \n Differentially Expressed Genes"),
+     bottom.label.text.angle = 0, 
+     bottom.label.size = 0.1,
+     bottom.label.text.size = 5,
+     bottom.label.text.alignment = c("center"), smooth.heat = T)
+
+```
+
+```{r}
+sessionInfo()
+```
+
